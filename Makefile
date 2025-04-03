@@ -15,4 +15,4 @@ pre-commit:   ## Configure pre-commit hooks locally.
 
 .PHONY: new-etl
 new-etl:
-	@cookiecutter ./tools/prototype --output-dir ./packages/services
+	@cookiecutter ./tools/prototype --output-dir ./packages/apps

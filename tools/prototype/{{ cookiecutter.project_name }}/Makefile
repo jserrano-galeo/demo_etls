@@ -55,7 +55,7 @@ clean:  ## Delete Python binaries.
 .PHONY: build
 build: .install  ## Build local image with DOCKER_TAG.
 	@docker build -f ../../../docker/default.dockerfile \
-		--build-arg PROJECT_PATH=packages/services/{{ cookiecutter.project_name }}\
+		--build-arg PROJECT_PATH=packages/apps/{{ cookiecutter.project_name }}\
 		--build-arg CODEARTIFACT_AUTH_TOKEN="${CODEARTIFACT_AUTH_TOKEN}"\
 		--build-arg PIPENV_OPTIONS="" \
 		-t $(DOCKER_IMAGE):$(DOCKER_TAG) ../../../
@@ -64,7 +64,7 @@ build: .install  ## Build local image with DOCKER_TAG.
 .PHONY: build-dev
 build-dev: .install  ## Build local image with DOCKER_DEV_TAG.
 	@docker build -f ../../../docker/default.dockerfile \
-		--build-arg PROJECT_PATH=packages/services/{{ cookiecutter.project_name }}\
+		--build-arg PROJECT_PATH=packages/apps/{{ cookiecutter.project_name }}\
 		--build-arg CODEARTIFACT_AUTH_TOKEN="${CODEARTIFACT_AUTH_TOKEN}"\
 		--build-arg PIPENV_OPTIONS="--dev" \
 		-t $(DOCKER_IMAGE):$(DOCKER_TAG) ../../../

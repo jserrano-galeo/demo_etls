@@ -450,15 +450,9 @@ override.tf.json
 # Ignore CLI configuration files
 .terraformrc
 terraform.rc
-packages/services/**/data/
-packages/services/**/models/
 
 # Parquets
 *.parquet
-/packages/services/async_model/src/async_model/artifacts/layout_extraction/chart/detector/best.pt
 
 node_modules/
-mlruns/
-openapi.json
-.forge_auth_token
 logs/
