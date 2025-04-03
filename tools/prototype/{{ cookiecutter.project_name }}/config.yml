@@ -1,0 +1,7 @@
+{{ cookiecutter.project_name }}:
+    src: path
+    dst: path
+    snowflake_url: ${SNOWFLAKE_URL} #(local testing : snowflake://user:password@host)
+    
+    {{ cookiecutter.project_name }}.task1:
+        some_value: "some_value"

@@ -1,0 +1,30 @@
+[tool.poetry]
+authors = ["{{ cookiecutter.author }} {{ cookiecutter.author_email }}"]
+description = "ETL: {{ cookiecutter.project_name }}"
+name = "{{ cookiecutter.project_name }}"
+version = "{{ cookiecutter.project_version }}"
+
+[tool.poetry.dependencies]
+loguru = "^0.7.2"
+pydantic = "^2.5.2"
+python = "^3.10"
+starlette = "~=0.31"
+toml = "^0.10.2"
+common = { path = "../../libraries/common", develop = true }
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.3"
+pytest-cov = "^5.0"
+
+[build-system]
+build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core"]
+
+[tool.coverage.run]
+branch = true
+relative_files = true
+source = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "--cov=src --cov-report=xml"
+testpaths = ["tests"]

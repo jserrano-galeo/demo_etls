@@ -1,0 +1,17 @@
+services:
+  {{ cookiecutter.project_name }}:
+    build:
+      context: ../../../
+      dockerfile: ./docker/default.dockerfile
+      args:
+        PROJECT_PATH: packages/services/{{ cookiecutter.project_name }}
+    image: datascience/{{ cookiecutter.project_name }}:latest
+    container_name: {{ cookiecutter.project_name }}
+    env_file: ".env"
+    environment:
+      - PROJECT_PATH=packages/services/{{ cookiecutter.project_name }}
+    network_mode: "host"
+    volumes:
+      - ${HOME}/.aws:/root/.aws
+    mem_limit: 5120m
+    cpus: 2
