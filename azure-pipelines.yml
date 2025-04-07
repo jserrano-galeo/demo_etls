@@ -1,57 +1,87 @@
 trigger:
-- '*'
+  branches:
+    include:
+      - master
+  tags:
+    include:
+      - '*'
+
+pr:
+  branches:
+    include:
+      - master
 
 variables:
-  AWS_REGION: 'us-west-2'  # Cambia según tu región
+  AWS_REGION: $(AWS_REGION)  # Cambia según tu región
+  AWS_ACCOUNT_ID: $(AWS_ACCOUNT_ID)  # ID de cuenta de AWS
   AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)  # Configura la variable de entorno
   AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)  # Configura la variable de entorno
-  GIT_TAG: $(Build.SourceVersion)  # El tag de Git del commit actual
-  AWS_ACCOUNT_ID: $(AWS_ACCOUNT_ID)  # ID de cuenta de AWS
   IMAGE_TAG: $(Build.SourceVersion)  # Usamos el tag de Git como tag de la imagen
+  SUBPROJECT_DIRS: 'packages/apps/*'  # Path to subprojects
+
+pool:
+  vmImage: 'ubuntu-latest'
 
 stages:
-- stage: BuildAndPush
-  jobs:
-  - job: BuildAndPublishDockerImage
-    pool:
-      vmImage: 'ubuntu-latest'
-
-    steps:
-    - task: Checkout@1
-      displayName: 'Checkout code'
-
-    - task: UseDocker@0
-      inputs:
-        version: 'latest'
-      displayName: 'Use Docker'
-
-    - script: |
-        echo "Logging into AWS ECR"
-        aws --region $(AWS_REGION) ecr get-login-password | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-      displayName: 'Login to AWS ECR'
-
-    - script: |
-        # Obtener una lista de los subproyectos modificados
-        echo "Fetching list of modified subprojects..."
-        MODIFIED_SUBPROJECTS=$(git diff --name-only $(Build.SourceVersion) $(Build.SourceVersion)~1 | grep '/Makefile' | cut -d '/' -f1 | sort -u)
-
-        if [ -z "$MODIFIED_SUBPROJECTS" ]; then
-          echo "No subprojects were modified."
-        else
-          for subproject in $MODIFIED_SUBPROJECTS; do
-            echo "Building Docker image for $subproject"
-
-            # Construir la imagen Docker para el subproyecto modificado
-            cd $subproject
-            make build  # Asumiendo que el Makefile tiene un comando 'build' para construir la imagen
-
-            # Taggear la imagen con el tag de Git
-            IMAGE_NAME=$(basename $(pwd))  # El nombre de la imagen será el nombre de la carpeta del subproyecto
-            docker tag $IMAGE_NAME:latest $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$subproject:$GIT_TAG
-
-            # Publicar la imagen en ECR
-            docker push $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$subproject:$GIT_TAG
-            cd ..
-          done
-        fi
-      displayName: 'Build and Push Docker images for modified subprojects'
+  - stage: Build
+    displayName: 'Build and Tag Docker Images'
+    jobs:
+      - job: Checkout
+        displayName: 'Checkout Code'
+        steps:
+          - task: Checkout@1
+            displayName: 'Checkout code'
+      
+      - job: SetupAwsCli
+        displayName: 'Set up AWS CLI'
+        dependsOn: Checkout
+        steps:
+          - script: |
+              aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+            displayName: 'Login to AWS'
+            env:
+              AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY)
+              AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_KEY)
+      
+      - job: DetectChangedSubprojects
+        displayName: 'Detect Changed Subprojects'
+        dependsOn: SetupAwsCli
+        steps:
+          - script: |
+              echo "Detecting changed subprojects..."
+              git fetch --prune --unshallow
+              changedDirs=$(git diff --name-only $(Build.SourceVersion) $(Build.SourceBranch) | grep -E '^packages/apps/.*' | cut -d '/' -f3 | sort | uniq)
+              echo "Changed subprojects: $changedDirs"
+              echo "##vso[task.setvariable variable=changedDirs]$changedDirs"
+            displayName: 'Detect Changed Subprojects'
+      
+  - stage: BuildAndPush
+    displayName: 'Build and Push Docker Images'
+    dependsOn: Build
+    jobs:
+      - job: BuildImages
+        displayName: 'Build Docker Images for Subprojects'
+        steps:
+          - ${{ each subproject in variables.changedDirs.split('\n') }}:
+            - script: |
+                echo "Building Docker image for subproject: $(subproject)"
+                cd packages/apps/$(subproject)
+                make build
+                docker build -f docker/default.dockerfile -t $(dockerRegistry)/$(subproject):latest .
+                docker tag $(dockerRegistry)/$(subproject):latest $(dockerRegistry)/$(subproject):$(IMAGE_TAG)
+                docker push $(dockerRegistry)/$(subproject):latest
+                docker push $(dockerRegistry)/$(subproject):$(IMAGE_TAG)
+              displayName: 'Build and push Docker image for $(subproject)'
+      
+      - job: PushImagesToECR
+        displayName: 'Push Docker Images to ECR'
+        dependsOn: BuildImages
+        steps:
+          - script: |
+              aws ecr get-login-password --region $(awsRegion) | docker login --username AWS --password-stdin $(dockerRegistry)
+              echo "Pushing Docker images to ECR"
+              ${{ each subproject in variables.changedDirs.split('\n') }}:
+                cd $(subproject) && make build
+                docker push $(dockerRegistry)/$(subproject):latest
+                docker push $(dockerRegistry)/$(subproject):$(IMAGE_TAG)
+            displayName: 'Push Docker images to ECR'

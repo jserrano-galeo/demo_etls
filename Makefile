@@ -14,5 +14,5 @@ pre-commit:   ## Configure pre-commit hooks locally.
 	@echo "Done"
 
 .PHONY: new-etl
-new-etl:
+new-etl:  ## Builds a new ETL.
 	@cookiecutter ./tools/prototype --output-dir ./packages/apps
